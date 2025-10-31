@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import AnalysisPage from './pages/AnalysisPage';
 import ResultsPage from './pages/ResultsPage';
+import ComponentShowcase from './pages/ComponentShowcase';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/upload/:subjectId" element={<UploadPage />} />
           <Route path="/analysis/:subjectId" element={<AnalysisPage />} />
           <Route path="/results/:subjectId/:resultId?" element={<ResultsPage />} />
+          <Route path="/showcase" element={<ComponentShowcase />} />
         </Routes>
       </Layout>
     </Router>
