@@ -1,4 +1,4 @@
-import { Subject } from '../types';
+import type { Subject } from '../types/index.js';
 
 export const SUBJECTS: Record<string, Subject> = {
   hanmun: {
