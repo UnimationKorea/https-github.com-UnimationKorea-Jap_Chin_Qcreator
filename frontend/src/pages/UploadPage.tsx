@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSubjectById } from '../utils/subjects';
 import Button from '../components/ui/Button';
@@ -20,6 +20,18 @@ export default function UploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showSchemaModal, setShowSchemaModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // 페이지 로드 시 기존 데이터 확인
+  useEffect(() => {
+    const uploadDataStr = localStorage.getItem('currentUpload');
+    if (uploadDataStr) {
+      const uploadData = JSON.parse(uploadDataStr);
+      // 다른 과목의 데이터라면 리셋
+      if (uploadData.subjectId !== subjectId) {
+        localStorage.removeItem('currentUpload');
+      }
+    }
+  }, [subjectId]);
 
   if (!subject) {
     return (
@@ -46,6 +58,16 @@ export default function UploadPage() {
     }
 
     setIsProcessing(true);
+    
+    // 업로드된 파일 정보를 localStorage에 저장
+    const uploadData = {
+      subjectId,
+      fileCount: selectedFiles.length,
+      fileNames: selectedFiles.map(f => f.name),
+      uploadMode,
+      timestamp: new Date().toISOString()
+    };
+    localStorage.setItem('currentUpload', JSON.stringify(uploadData));
     
     // 시뮬레이션: 실제로는 서버에 파일을 업로드
     setTimeout(() => {

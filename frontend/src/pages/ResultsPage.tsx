@@ -50,6 +50,11 @@ export default function ResultsPage() {
   const navigate = useNavigate();
   const subject = subjectId ? getSubjectById(subjectId) : null;
   const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
+  
+  // localStorage에서 업로드 정보 가져오기
+  const uploadDataStr = localStorage.getItem('currentUpload');
+  const uploadData = uploadDataStr ? JSON.parse(uploadDataStr) : null;
+  const totalPages = uploadData?.fileCount || 3;
 
   if (!subject) {
     navigate('/');
@@ -60,8 +65,9 @@ export default function ResultsPage() {
     const data = {
       subject: subjectId,
       generatedAt: new Date().toISOString(),
+      uploadInfo: uploadData,
       summary: {
-        totalPages: 3,
+        totalPages,
         vocabularyCount: mockVocabulary.length,
         grammarCount: mockGrammar.length,
         exerciseCount: mockExercises.length,
@@ -88,6 +94,13 @@ export default function ResultsPage() {
   const handleDownloadPDF = () => {
     setDownloadStatus('PDF 다운로드 기능은 백엔드 연동 후 지원됩니다');
     setTimeout(() => setDownloadStatus(null), 3000);
+  };
+  
+  const handleNewAnalysis = () => {
+    // 기존 데이터 리셋
+    localStorage.removeItem('currentUpload');
+    // 업로드 페이지로 이동
+    navigate(`/upload/${subjectId}`);
   };
 
   return (
@@ -149,7 +162,7 @@ export default function ResultsPage() {
         <Button
           variant="secondary"
           icon={<BookOpen className="w-4 h-4" />}
-          onClick={() => navigate(`/upload/${subjectId}`)}
+          onClick={handleNewAnalysis}
         >
           새로운 자료 분석
         </Button>
@@ -172,7 +185,7 @@ export default function ResultsPage() {
                   <span className="text-2xl">📄</span>
                 </div>
                 <p className="text-sm text-gray-600 mb-1">총 페이지</p>
-                <p className="text-3xl font-bold text-gray-900">3</p>
+                <p className="text-3xl font-bold text-gray-900">{totalPages}</p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-md">

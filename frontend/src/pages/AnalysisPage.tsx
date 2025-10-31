@@ -17,10 +17,15 @@ export default function AnalysisPage() {
   const navigate = useNavigate();
   const subject = subjectId ? getSubjectById(subjectId) : null;
   
+  // localStorage에서 업로드 정보 가져오기
+  const uploadDataStr = localStorage.getItem('currentUpload');
+  const uploadData = uploadDataStr ? JSON.parse(uploadDataStr) : null;
+  const fileCount = uploadData?.fileCount || 0;
+  
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<AnalysisStep[]>([
-    { id: 1, label: '파일 처리', description: '텍스트 추출 및 전처리', completed: false },
+    { id: 1, label: '파일 처리', description: `${fileCount}개 파일의 텍스트 추출 및 전처리`, completed: false },
     { id: 2, label: '내용 분석', description: '문법, 어휘 분석 진행', completed: false },
     { id: 3, label: '문제 생성', description: '다양한 유형의 문제 생성', completed: false },
     { id: 4, label: '결과 준비', description: '최종 검토 및 포맷팅', completed: false },
@@ -168,6 +173,7 @@ export default function AnalysisPage() {
               분석이 완료되면 자동으로 결과 페이지로 이동합니다
             </p>
             <p className="text-xs text-blue-700 mt-1">
+              {fileCount > 0 ? `${fileCount}개 파일을 분석 중입니다. ` : ''}
               AI가 {subject.features.join(', ')} 등을 수행하고 있습니다
             </p>
           </div>
