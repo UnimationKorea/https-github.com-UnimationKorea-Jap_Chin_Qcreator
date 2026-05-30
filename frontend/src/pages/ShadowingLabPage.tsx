@@ -15,12 +15,14 @@ const isLikelyPdf = (file: File) =>
 type PageText = ProjectPage;
 
 const SAMPLE: Record<ShadowingLanguage, string> = {
+  en: 'The sun was shining over the quiet village. Tom opened the door and looked outside. "What a beautiful morning!" he said with a smile.',
   ja: '今日はいい天気です。公園へ散歩に行きましょう。猫が木の下で寝ています。',
   zh: '今天天气很好。我们去公园散步吧。猫在树下睡觉。',
   ko: '오늘은 날씨가 좋습니다. 공원에 산책하러 갑시다. 고양이가 나무 아래에서 자고 있습니다.',
 };
 
 const LANG_LABEL: Record<ShadowingLanguage, string> = {
+  en: '영어',
   ja: '일본어',
   zh: '중국어',
   ko: '한국어',
@@ -32,7 +34,7 @@ const LANG_LABEL: Record<ShadowingLanguage, string> = {
  * 연속 재생 모드에서는 한 페이지가 끝나면 다음 페이지로 자동 진행한다.
  */
 export default function ShadowingLabPage() {
-  const [language, setLanguage] = useState<ShadowingLanguage>('ko');
+  const [language, setLanguage] = useState<ShadowingLanguage>('en');
   const [text, setText] = useState('');
   const [pages, setPages] = useState<PageText[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -149,7 +151,7 @@ export default function ShadowingLabPage() {
           {/* 언어 선택 */}
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-gray-600">언어</span>
-            {(['ja', 'zh', 'ko'] as ShadowingLanguage[]).map((lng) => (
+            {(['en', 'ja', 'zh', 'ko'] as ShadowingLanguage[]).map((lng) => (
               <button
                 key={lng}
                 onClick={() => setLanguage(lng)}

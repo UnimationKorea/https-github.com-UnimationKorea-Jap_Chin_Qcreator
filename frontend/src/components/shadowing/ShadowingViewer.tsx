@@ -53,7 +53,7 @@ export default function ShadowingViewer({
 
   // 현재 언어에 맞는 음성 우선 정렬
   const langPrefix = useMemo(
-    () => ({ ja: 'ja', zh: 'zh', ko: 'ko' }[language]),
+    () => ({ en: 'en', ja: 'ja', zh: 'zh', ko: 'ko' }[language]),
     [language],
   );
   const sortedVoices = useMemo(() => {

@@ -18,6 +18,7 @@ export interface ShadowingPlayerCallbacks {
 }
 
 const BCP47: Record<ShadowingLanguage, string> = {
+  en: 'en-US',
   ja: 'ja-JP',
   zh: 'zh-CN',
   ko: 'ko-KR',

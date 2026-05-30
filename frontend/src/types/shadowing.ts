@@ -1,7 +1,7 @@
 // Shadowing(노래방 자막식 따라읽기) 관련 타입
 // 개발전략 문서(EBOOK_SHADOWING_STRATEGY.md) 섹션 3의 Shadowing Manifest 스키마 구현
 
-export type ShadowingLanguage = 'ja' | 'zh' | 'ko';
+export type ShadowingLanguage = 'en' | 'ja' | 'zh' | 'ko';
 
 /** 오디오 확보 방식: tts(합성) | file(기존 녹음) */
 export type AudioMode = 'tts' | 'file';
