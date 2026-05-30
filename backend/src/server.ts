@@ -14,13 +14,15 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api/audio', express.static(audioCache.directory, { maxAge: '1d', immutable: true }));
 
 // 상태 확인 — 어떤 프로바이더로 동작 중인지 노출
-app.get('/health', (_req, res) => {
+const health = (_req: express.Request, res: express.Response) => {
   res.json({
     ok: true,
     ttsProvider: config.ttsProvider,
     alignProvider: config.alignProvider,
   });
-});
+};
+app.get('/health', health);
+app.get('/api/health', health); // 프론트 Vite proxy(/api)로 닿도록 동일 핸들러 노출
 
 app.use('/api', ttsRouter);
 app.use('/api', alignRouter);

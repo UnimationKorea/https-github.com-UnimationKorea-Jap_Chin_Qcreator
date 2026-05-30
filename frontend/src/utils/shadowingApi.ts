@@ -23,18 +23,33 @@ export interface ManifestPage {
 
 const api = axios.create({ baseURL: '/api' });
 
-/** 백엔드 가동 여부 + 활성 프로바이더 확인 */
-export async function getBackendHealth(): Promise<{
+export interface BackendHealth {
   ok: boolean;
   ttsProvider: string;
   alignProvider: string;
-} | null> {
-  try {
-    const { data } = await axios.get('/health', { timeout: 1500 });
-    return data;
-  } catch {
-    return null;
-  }
+}
+
+// 페이지 전환마다 1.5s 프로브가 반복되지 않도록 세션 캐시(연속 재생 끊김 방지)
+let healthCache: { value: BackendHealth | null } | undefined;
+let healthInflight: Promise<BackendHealth | null> | undefined;
+
+/** 백엔드 가동 여부 + 활성 프로바이더 확인 (세션 캐시, force로 재탐지) */
+export async function getBackendHealth(force = false): Promise<BackendHealth | null> {
+  if (!force && healthCache !== undefined) return healthCache.value;
+  if (!force && healthInflight) return healthInflight;
+  healthInflight = (async () => {
+    try {
+      const { data } = await axios.get<BackendHealth>('/api/health', { timeout: 1500 });
+      healthCache = { value: data };
+      return data;
+    } catch {
+      healthCache = { value: null };
+      return null;
+    } finally {
+      healthInflight = undefined;
+    }
+  })();
+  return healthInflight;
 }
 
 /** 문장 배열을 서버 TTS로 합성하고 타임스탬프가 담긴 ManifestPage를 받는다 */

@@ -7,6 +7,8 @@ import {
   isSpeechSupported,
   loadVoices,
 } from '../../utils/shadowingTTS';
+import { AudioClipPlayer, type ShadowingEngine } from '../../utils/shadowingAudio';
+import { getBackendHealth, synthesizePage } from '../../utils/shadowingApi';
 
 interface ShadowingViewerProps {
   sentences: ShadowingSentence[];
@@ -48,8 +50,11 @@ export default function ShadowingViewer({
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceURI, setVoiceURI] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  // 재생 엔진 종류: null=준비 중, 'audio'=백엔드 클립, 'speech'=Web Speech
+  const [engineKind, setEngineKind] = useState<'audio' | 'speech' | null>(null);
+  const [providerName, setProviderName] = useState<string>('');
 
-  const playerRef = useRef<ShadowingPlayer | null>(null);
+  const playerRef = useRef<ShadowingEngine | null>(null);
   const activeRef = useRef<HTMLSpanElement | null>(null);
 
   // 콜백/플래그는 ref로 보관해 플레이어 콜백의 stale closure를 피한다
@@ -89,46 +94,85 @@ export default function ShadowingViewer({
     };
   }, [langPrefix]);
 
-  // 플레이어 (재)생성: 문장/언어가 바뀌면 새로 만든다
+  // 엔진 (재)생성: 백엔드가 있으면 클립 오디오, 없으면 Web Speech로 폴백
   useEffect(() => {
-    const player = new ShadowingPlayer({
-      sentences,
-      lang: language,
-      rate,
-      callbacks: {
-        onSentenceStart: (i) => {
-          setActiveIndex(i);
-          setActiveWord(null);
-        },
-        onWordBoundary: (sentence, start, length) => {
-          const text = sentences[sentence]?.text ?? '';
-          const [s, e] = wordRangeAt(text, start, length);
-          setActiveWord({ sentence, start: s, end: e });
-        },
-        onEnd: () => {
-          setPlaying(false);
-          setActiveIndex(-1);
-          setActiveWord(null);
-          onCompleteRef.current?.();
-        },
-        onError: (msg) => {
-          setError(msg);
-          setPlaying(false);
-        },
-      },
-    });
-    playerRef.current = player;
-    setActiveIndex(-1);
-    setPlaying(false);
+    let cancelled = false;
+    let engine: ShadowingEngine | null = null;
 
-    // 연속 재생 모드: 새 페이지(문장)가 로드되면 자동으로 재생 시작
-    if (autoPlayRef.current && sentences.length > 0) {
-      player.play(0);
-      setPlaying(true);
-    }
+    const callbacks = {
+      onSentenceStart: (i: number) => {
+        setActiveIndex(i);
+        setActiveWord(null);
+      },
+      onWordBoundary: (sentence: number, start: number, length: number) => {
+        const text = sentences[sentence]?.text ?? '';
+        const [s, e] = wordRangeAt(text, start, length);
+        setActiveWord({ sentence, start: s, end: e });
+      },
+      onEnd: () => {
+        setPlaying(false);
+        setActiveIndex(-1);
+        setActiveWord(null);
+        onCompleteRef.current?.();
+      },
+      onError: (msg: string) => {
+        setError(msg);
+        setPlaying(false);
+      },
+    };
+
+    const setup = async () => {
+      setEngineKind(null);
+      setProviderName('');
+
+      // 1) 백엔드 클립 오디오 시도
+      let clips: string[] | null = null;
+      if (sentences.length > 0) {
+        const health = await getBackendHealth();
+        if (health?.ok && !cancelled) {
+          try {
+            const page = await synthesizePage({
+              language,
+              rate,
+              sentences: sentences.map((s) => ({ id: s.id, text: s.text })),
+            });
+            const urls = page.sentences.map((s) => s.clipUrl).filter((u): u is string => !!u);
+            if (urls.length === sentences.length) {
+              clips = urls;
+              setProviderName(page.provider);
+            }
+          } catch {
+            clips = null;
+          }
+        }
+      }
+      if (cancelled) return;
+
+      // 2) 엔진 결정
+      if (clips) {
+        engine = new AudioClipPlayer({ clips, rate, callbacks });
+        setEngineKind('audio');
+      } else {
+        engine = new ShadowingPlayer({ sentences, lang: language, rate, callbacks });
+        setEngineKind('speech');
+      }
+      playerRef.current = engine;
+      setActiveIndex(-1);
+      setActiveWord(null);
+      setPlaying(false);
+
+      // 연속 재생 모드: 새 페이지(문장)가 로드되면 자동으로 재생 시작
+      if (autoPlayRef.current && sentences.length > 0) {
+        engine.play(0);
+        setPlaying(true);
+      }
+    };
+
+    void setup();
 
     return () => {
-      player.stop();
+      cancelled = true;
+      engine?.stop();
     };
     // rate/voice는 별도 effect에서 주입하므로 deps에서 제외
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,7 +184,7 @@ export default function ShadowingViewer({
   }, [rate]);
   useEffect(() => {
     const v = voices.find((x) => x.voiceURI === voiceURI) ?? null;
-    playerRef.current?.setVoice(v);
+    playerRef.current?.setVoice?.(v);
   }, [voiceURI, voices]);
 
   // 활성 문장 자동 스크롤
@@ -176,10 +220,12 @@ export default function ShadowingViewer({
     setPlaying(true);
   };
 
-  if (!supported) {
+  // Web Speech 미지원 + 백엔드 오디오도 아니면 안내 (백엔드가 켜져 있으면 오디오로 동작)
+  if (!supported && engineKind === 'speech') {
     return (
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-800">
-        이 브라우저는 음성 합성(Web Speech API)을 지원하지 않습니다. Chrome/Edge 등에서 실행해 주세요.
+        이 브라우저는 음성 합성(Web Speech API)을 지원하지 않습니다. 백엔드(클라우드 TTS)를 켜거나
+        Chrome/Edge 등에서 실행해 주세요.
       </div>
     );
   }
@@ -223,20 +269,42 @@ export default function ShadowingViewer({
           ))}
         </select>
 
-        {/* 음성 */}
-        <label className="ml-2 text-sm text-gray-600">음성</label>
-        <select
-          className="max-w-[220px] rounded-md border border-gray-300 px-2 py-1 text-sm"
-          value={voiceURI}
-          onChange={(e) => setVoiceURI(e.target.value)}
+        {/* 음성 (Web Speech 모드에서만) */}
+        {engineKind === 'speech' && (
+          <>
+            <label className="ml-2 text-sm text-gray-600">음성</label>
+            <select
+              className="max-w-[220px] rounded-md border border-gray-300 px-2 py-1 text-sm"
+              value={voiceURI}
+              onChange={(e) => setVoiceURI(e.target.value)}
+            >
+              {sortedVoices.length === 0 && <option value="">기본</option>}
+              {sortedVoices.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name} ({v.lang})
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        {/* 재생 모드 배지 */}
+        <span
+          className={
+            'ml-auto rounded-full px-2.5 py-1 text-xs font-medium ' +
+            (engineKind === 'audio'
+              ? 'bg-green-100 text-green-700'
+              : engineKind === 'speech'
+                ? 'bg-gray-100 text-gray-600'
+                : 'bg-amber-100 text-amber-700')
+          }
         >
-          {sortedVoices.length === 0 && <option value="">기본</option>}
-          {sortedVoices.map((v) => (
-            <option key={v.voiceURI} value={v.voiceURI}>
-              {v.name} ({v.lang})
-            </option>
-          ))}
-        </select>
+          {engineKind === 'audio'
+            ? `클라우드 오디오 · ${providerName}`
+            : engineKind === 'speech'
+              ? '브라우저 음성 (Web Speech)'
+              : '준비 중…'}
+        </span>
       </div>
 
       {error && (
@@ -288,7 +356,10 @@ export default function ShadowingViewer({
       </div>
 
       <p className="text-xs text-gray-400">
-        문장을 클릭하면 해당 위치부터 재생됩니다. (Web Speech API · 단어 단위 하이라이트, 미지원 브라우저는 문장 단위로 표시)
+        문장을 클릭하면 해당 위치부터 재생됩니다.{' '}
+        {engineKind === 'audio'
+          ? '백엔드 클라우드 TTS 클립으로 재생 중 (문장 단위 하이라이트).'
+          : '브라우저 Web Speech로 재생 중 (단어 단위 하이라이트). 백엔드를 켜면 클라우드 음질로 자동 전환됩니다.'}
       </p>
     </div>
   );
