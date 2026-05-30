@@ -23,6 +23,8 @@ interface ProjectPanelProps {
   onProjectIdChange: (id: string | null) => void;
   /** 프로젝트/가져오기 내용을 에디터에 적용 */
   onLoad: (data: { language: ShadowingLanguage; pages: ProjectPage[] }) => void;
+  /** 값이 바뀌면 목록을 다시 읽는다(배치 업로드 후 새로고침용) */
+  refreshSignal?: number;
 }
 
 const safeName = (s: string) => s.replace(/[^\w가-힣\-\s.]/g, '_').trim() || 'shadowing';
@@ -33,13 +35,14 @@ export default function ProjectPanel({
   projectId,
   onProjectIdChange,
   onLoad,
+  refreshSignal,
 }: ProjectPanelProps) {
   const [projects, setProjects] = useState<ShadowingProject[]>([]);
   const [name, setName] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
 
   const refresh = () => setProjects(listProjects());
-  useEffect(refresh, []);
+  useEffect(refresh, [refreshSignal]);
 
   const canSave = pages.length > 0;
 
@@ -156,7 +159,8 @@ export default function ProjectPanel({
               <div className="min-w-[160px] flex-1">
                 <div className="text-sm font-medium text-gray-800">{p.name}</div>
                 <div className="text-xs text-gray-400">
-                  {p.pages.length}페이지 · {new Date(p.updatedAt).toLocaleString()}
+                  {p.language.toUpperCase()} · {p.pages.length}페이지 ·{' '}
+                  {new Date(p.updatedAt).toLocaleString()}
                 </div>
               </div>
               <Button size="sm" variant="ghost" onClick={() => handleOpen(p)} icon={<FolderOpen className="h-4 w-4" />}>

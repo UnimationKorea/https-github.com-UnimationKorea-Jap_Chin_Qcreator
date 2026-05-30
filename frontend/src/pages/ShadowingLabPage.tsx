@@ -3,6 +3,7 @@ import { FileText, Wand2, Upload, ChevronLeft, ChevronRight, BookOpen } from 'lu
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '../components/ui';
 import ShadowingViewer from '../components/shadowing/ShadowingViewer';
 import ProjectPanel from '../components/shadowing/ProjectPanel';
+import BatchUpload from '../components/shadowing/BatchUpload';
 import { splitIntoSentences } from '../utils/sentenceSplitter';
 import type { ProjectPage } from '../utils/shadowingStore';
 import type { ShadowingLanguage } from '../types/shadowing';
@@ -53,6 +54,7 @@ export default function ShadowingLabPage() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [librarySignal, setLibrarySignal] = useState(0);
 
   const total = pages.length;
   const page = pages[currentPage];
@@ -233,15 +235,20 @@ export default function ShadowingLabPage() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>2. 프로젝트 저장 · 재사용</CardTitle>
+          <CardTitle>2. 라이브러리 (여러 책 저장 · 재사용)</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-5">
+          <BatchUpload
+            language={language}
+            onProjectsCreated={() => setLibrarySignal((n) => n + 1)}
+          />
           <ProjectPanel
             language={language}
             pages={pages}
             projectId={projectId}
             onProjectIdChange={setProjectId}
             onLoad={applyLoaded}
+            refreshSignal={librarySignal}
           />
         </CardContent>
       </Card>
