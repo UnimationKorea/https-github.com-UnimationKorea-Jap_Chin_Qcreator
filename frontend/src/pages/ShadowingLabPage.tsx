@@ -3,8 +3,11 @@ import { FileText, Wand2, Upload } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '../components/ui';
 import ShadowingViewer from '../components/shadowing/ShadowingViewer';
 import { splitIntoSentences } from '../utils/sentenceSplitter';
-import { extractPdfText, isLikelyPdf, PdfNotAvailableError } from '../utils/pdfText';
 import type { ShadowingLanguage, ShadowingSentence } from '../types/shadowing';
+
+// PDF는 무거우므로(pdfjs) 업로드 시에만 동적 로드한다.
+const isLikelyPdf = (file: File) =>
+  file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
 const SAMPLE: Record<ShadowingLanguage, string> = {
   ja: '今日はいい天気です。公園へ散歩に行きましょう。猫が木の下で寝ています。',
@@ -23,7 +26,7 @@ const LANG_LABEL: Record<ShadowingLanguage, string> = {
  * 텍스트 입력 또는 PDF 업로드 → 문장 분할 → 노래방식 하이라이트 재생.
  */
 export default function ShadowingLabPage() {
-  const [language, setLanguage] = useState<ShadowingLanguage>('ja');
+  const [language, setLanguage] = useState<ShadowingLanguage>('ko');
   const [text, setText] = useState('');
   const [sentences, setSentences] = useState<ShadowingSentence[]>([]);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -48,6 +51,7 @@ export default function ShadowingLabPage() {
     }
     setPdfBusy(true);
     try {
+      const { extractPdfText } = await import('../utils/pdfText');
       // PoC: 1페이지만 추출 (1권·1페이지 범위)
       const { pages } = await extractPdfText(file, 1);
       const pageText = pages[0] ?? '';
@@ -59,12 +63,8 @@ export default function ShadowingLabPage() {
         setText(pageText);
         setSentences(splitIntoSentences(pageText, language));
       }
-    } catch (e) {
-      if (e instanceof PdfNotAvailableError) {
-        setNotice(e.message);
-      } else {
-        setNotice('PDF 처리 중 오류가 발생했습니다. 텍스트를 직접 붙여넣어 주세요.');
-      }
+    } catch {
+      setNotice('PDF 처리 중 오류가 발생했습니다. 텍스트를 직접 붙여넣어 주세요.');
     } finally {
       setPdfBusy(false);
     }

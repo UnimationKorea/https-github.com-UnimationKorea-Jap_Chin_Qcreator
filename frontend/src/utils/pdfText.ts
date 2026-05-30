@@ -1,44 +1,20 @@
 /**
- * PDF 페이지별 텍스트 추출 (선택 기능).
+ * PDF 페이지별 텍스트 추출 (pdfjs-dist).
  *
- * 전략 문서(섹션 4)대로 pdfjs-dist를 사용하되, PoC에서는 "선택적 의존성"으로 둔다.
- * - 설치되어 있으면: PDF 업로드 → 페이지별 텍스트 추출
- * - 미설치(또는 스캔본)면: 사용자에게 텍스트 직접 입력을 안내
- *
- * pdfjs-dist가 없을 때도 앱 빌드가 깨지지 않도록, 정적 import 대신
- * 런타임 동적 import(계산된 specifier)로 로드한다.
+ * 전략 문서(섹션 4)대로 pdfjs-dist로 PDF 텍스트레이어를 추출한다.
+ * Vite가 워커를 번들링하도록 `?url` import를 사용한다.
+ * 텍스트레이어가 없는 스캔본은 빈 문자열이 반환되며, 호출부에서 OCR 안내로 분기한다.
  */
+import * as pdfjsLib from 'pdfjs-dist';
+import type { TextItem } from 'pdfjs-dist/types/src/display/api';
+// Vite의 ?url 접미사는 모듈이 아니라 번들된 워커의 URL 문자열을 반환한다
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 export interface PdfExtractResult {
   pages: string[]; // 페이지별 텍스트
-}
-
-export class PdfNotAvailableError extends Error {
-  constructor() {
-    super(
-      'PDF 추출 모듈(pdfjs-dist)이 설치되어 있지 않습니다. ' +
-        '`npm i pdfjs-dist` 후 사용하거나, 텍스트를 직접 붙여넣어 주세요.',
-    );
-    this.name = 'PdfNotAvailableError';
-  }
-}
-
-// TS의 정적 모듈 해석을 피하기 위해 specifier를 런타임에 구성한다.
-const PDFJS_SPECIFIER = 'pdfjs' + '-dist';
-
-// 선택적·동적 import 모듈이라 타입 정의가 없어 any를 허용한다.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function loadPdfjs(): Promise<any> {
-  try {
-    const mod = await import(/* @vite-ignore */ PDFJS_SPECIFIER);
-    const pdfjs = mod.default ?? mod;
-    if (pdfjs?.GlobalWorkerOptions && pdfjs?.version) {
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
-    }
-    return pdfjs;
-  } catch {
-    throw new PdfNotAvailableError();
-  }
+  numPages: number;
 }
 
 export function isLikelyPdf(file: File): boolean {
@@ -50,25 +26,24 @@ export async function extractPdfText(
   file: File,
   onlyPage?: number,
 ): Promise<PdfExtractResult> {
-  const pdfjs = await loadPdfjs();
   const data = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data }).promise;
+  const doc = await pdfjsLib.getDocument({ data }).promise;
 
   const pages: string[] = [];
   const start = onlyPage ?? 1;
   const end = onlyPage ?? doc.numPages;
 
-  for (let p = start; p <= end; p++) {
+  for (let p = start; p <= Math.min(end, doc.numPages); p++) {
     const page = await doc.getPage(p);
     const content = await page.getTextContent();
     const text = content.items
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((it: any) => ('str' in it ? it.str : ''))
+      .map((it) => ('str' in it ? (it as TextItem).str : ''))
       .join(' ')
       .replace(/\s+\n/g, '\n')
+      .replace(/[ \t]{2,}/g, ' ')
       .trim();
     pages.push(text);
   }
 
-  return { pages };
+  return { pages, numPages: doc.numPages };
 }
