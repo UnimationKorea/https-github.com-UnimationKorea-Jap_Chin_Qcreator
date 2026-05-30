@@ -93,12 +93,18 @@ function endsWithSafeAbbrev(s: string): boolean {
   return !!m && EN_TITLE_ABBR.has(m[1].toLowerCase());
 }
 
-/** 약어/이니셜로 끝나 잘못 분리된 영어 문장을 다음 조각과 병합 */
-function mergeEnglishAbbreviations(sentences: string[]): string[] {
+// 영어에서 소문자로 시작하는 조각은 앞 문장의 연속으로 본다.
+// 대사+서술(예: "..." he said.)처럼 ICU가 과분할한 경우를 다시 합친다.
+function startsLowercase(s: string): boolean {
+  return /^[^A-Za-z]*[a-z]/.test(s.trimStart());
+}
+
+/** 약어/이니셜로 끝나거나, 다음 조각이 소문자로 시작해 잘못 분리된 영어 문장을 병합 */
+function mergeEnglishSentences(sentences: string[]): string[] {
   const out: string[] = [];
   for (const s of sentences) {
     const prev = out[out.length - 1];
-    if (prev && endsWithSafeAbbrev(prev)) {
+    if (prev && (endsWithSafeAbbrev(prev) || startsLowercase(s))) {
       out[out.length - 1] = `${prev} ${s}`;
     } else {
       out.push(s);
@@ -120,7 +126,7 @@ export function splitIntoSentences(
     : segmentWithPunctuation(text, language);
 
   if (language === 'en') {
-    sentences = mergeEnglishAbbreviations(sentences);
+    sentences = mergeEnglishSentences(sentences);
   }
 
   return sentences
