@@ -13,6 +13,8 @@ import type { ShadowingLanguage, ShadowingSentence } from '../types/shadowing';
 
 export interface ShadowingPlayerCallbacks {
   onSentenceStart?: (index: number) => void;
+  /** 단어 발화 시작 시점(노래방 단어 하이라이트). charIndex/charLength는 문장 텍스트 기준 */
+  onWordBoundary?: (sentenceIndex: number, charIndex: number, charLength: number) => void;
   onEnd?: () => void;
   onError?: (message: string) => void;
 }
@@ -136,6 +138,14 @@ export class ShadowingPlayer {
     utter.lang = BCP47[this.lang];
     utter.rate = this.rate;
     if (this.voice) utter.voice = this.voice;
+
+    // 단어 경계 이벤트 → 단어 단위 하이라이트 (지원 브라우저: Chrome/Edge 등)
+    const sentenceIndex = this.index;
+    utter.onboundary = (e) => {
+      if (this.stopped || !this.playing) return;
+      if (e.name && e.name !== 'word') return;
+      this.callbacks.onWordBoundary?.(sentenceIndex, e.charIndex, e.charLength ?? 0);
+    };
 
     utter.onend = () => {
       if (this.stopped || !this.playing) return;

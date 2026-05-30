@@ -19,6 +19,17 @@ interface ShadowingViewerProps {
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
 
+/** 경계 이벤트의 charIndex/charLength로 단어 범위를 계산. length 미제공 시 다음 공백까지 */
+function wordRangeAt(text: string, charIndex: number, charLength: number): [number, number] {
+  const start = Math.max(0, Math.min(charIndex, text.length));
+  let end = charLength > 0 ? start + charLength : start;
+  if (end <= start) {
+    const m = text.slice(start).match(/^\S+/);
+    end = start + (m ? m[0].length : 1);
+  }
+  return [start, Math.min(end, text.length)];
+}
+
 /**
  * 노래방 자막식 shadowing 뷰어.
  * 문장 단위 TTS를 순차 재생하며 현재 문장을 하이라이트한다.
@@ -30,6 +41,8 @@ export default function ShadowingViewer({
   onComplete,
 }: ShadowingViewerProps) {
   const [activeIndex, setActiveIndex] = useState(-1);
+  // 현재 발화 중인 단어 범위(문장 텍스트 기준). 경계 이벤트 미지원 시 null → 문장 단위 폴백
+  const [activeWord, setActiveWord] = useState<{ sentence: number; start: number; end: number } | null>(null);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -83,10 +96,19 @@ export default function ShadowingViewer({
       lang: language,
       rate,
       callbacks: {
-        onSentenceStart: (i) => setActiveIndex(i),
+        onSentenceStart: (i) => {
+          setActiveIndex(i);
+          setActiveWord(null);
+        },
+        onWordBoundary: (sentence, start, length) => {
+          const text = sentences[sentence]?.text ?? '';
+          const [s, e] = wordRangeAt(text, start, length);
+          setActiveWord({ sentence, start: s, end: e });
+        },
         onEnd: () => {
           setPlaying(false);
           setActiveIndex(-1);
+          setActiveWord(null);
           onCompleteRef.current?.();
         },
         onError: (msg) => {
@@ -143,6 +165,7 @@ export default function ShadowingViewer({
     playerRef.current?.stop();
     setPlaying(false);
     setActiveIndex(-1);
+    setActiveWord(null);
   };
   const handlePrev = () => {
     playerRef.current?.prev();
@@ -230,6 +253,7 @@ export default function ShadowingViewer({
           <p className="flex flex-wrap gap-x-1 gap-y-2">
             {sentences.map((s, i) => {
               const isActive = i === activeIndex;
+              const word = isActive && activeWord?.sentence === i ? activeWord : null;
               return (
                 <span
                   key={s.id}
@@ -241,11 +265,21 @@ export default function ShadowingViewer({
                   className={
                     'cursor-pointer rounded px-1 transition-colors duration-200 ' +
                     (isActive
-                      ? 'bg-primary-500 text-white shadow'
+                      ? 'bg-primary-100 text-primary-900'
                       : 'text-gray-800 hover:bg-gray-100')
                   }
                 >
-                  {s.text}
+                  {word ? (
+                    <>
+                      {s.text.slice(0, word.start)}
+                      <span className="rounded bg-primary-600 px-0.5 font-semibold text-white">
+                        {s.text.slice(word.start, word.end)}
+                      </span>
+                      {s.text.slice(word.end)}
+                    </>
+                  ) : (
+                    s.text
+                  )}
                 </span>
               );
             })}
@@ -254,7 +288,7 @@ export default function ShadowingViewer({
       </div>
 
       <p className="text-xs text-gray-400">
-        문장을 클릭하면 해당 위치부터 재생됩니다. (PoC: Web Speech API · 문장 단위 동기화)
+        문장을 클릭하면 해당 위치부터 재생됩니다. (Web Speech API · 단어 단위 하이라이트, 미지원 브라우저는 문장 단위로 표시)
       </p>
     </div>
   );
