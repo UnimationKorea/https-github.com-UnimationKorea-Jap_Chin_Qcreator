@@ -46,7 +46,7 @@ const mockExercises = [
 ];
 
 export default function ResultsPage() {
-  const { subjectId, resultId } = useParams<{ subjectId: string; resultId?: string }>();
+  const { subjectId } = useParams<{ subjectId: string; resultId?: string }>();
   const navigate = useNavigate();
   const subject = subjectId ? getSubjectById(subjectId) : null;
   const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
