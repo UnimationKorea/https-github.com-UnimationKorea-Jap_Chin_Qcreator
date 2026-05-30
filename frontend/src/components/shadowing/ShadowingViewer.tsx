@@ -11,6 +11,10 @@ import {
 interface ShadowingViewerProps {
   sentences: ShadowingSentence[];
   language: ShadowingLanguage;
+  /** 문장이 바뀔 때 자동으로 재생 시작 (연속 재생 모드용) */
+  autoPlay?: boolean;
+  /** 현재 페이지의 모든 문장 재생이 끝났을 때 호출 */
+  onComplete?: () => void;
 }
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
@@ -19,7 +23,12 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
  * 노래방 자막식 shadowing 뷰어.
  * 문장 단위 TTS를 순차 재생하며 현재 문장을 하이라이트한다.
  */
-export default function ShadowingViewer({ sentences, language }: ShadowingViewerProps) {
+export default function ShadowingViewer({
+  sentences,
+  language,
+  autoPlay = false,
+  onComplete,
+}: ShadowingViewerProps) {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
@@ -29,6 +38,16 @@ export default function ShadowingViewer({ sentences, language }: ShadowingViewer
 
   const playerRef = useRef<ShadowingPlayer | null>(null);
   const activeRef = useRef<HTMLSpanElement | null>(null);
+
+  // 콜백/플래그는 ref로 보관해 플레이어 콜백의 stale closure를 피한다
+  const onCompleteRef = useRef(onComplete);
+  const autoPlayRef = useRef(autoPlay);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+  useEffect(() => {
+    autoPlayRef.current = autoPlay;
+  }, [autoPlay]);
 
   const supported = isSpeechSupported();
 
@@ -68,6 +87,7 @@ export default function ShadowingViewer({ sentences, language }: ShadowingViewer
         onEnd: () => {
           setPlaying(false);
           setActiveIndex(-1);
+          onCompleteRef.current?.();
         },
         onError: (msg) => {
           setError(msg);
@@ -78,6 +98,13 @@ export default function ShadowingViewer({ sentences, language }: ShadowingViewer
     playerRef.current = player;
     setActiveIndex(-1);
     setPlaying(false);
+
+    // 연속 재생 모드: 새 페이지(문장)가 로드되면 자동으로 재생 시작
+    if (autoPlayRef.current && sentences.length > 0) {
+      player.play(0);
+      setPlaying(true);
+    }
+
     return () => {
       player.stop();
     };
