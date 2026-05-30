@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FileText, Wand2, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Wand2, Upload, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '../components/ui';
 import ShadowingViewer from '../components/shadowing/ShadowingViewer';
 import ProjectPanel from '../components/shadowing/ProjectPanel';
@@ -27,6 +27,16 @@ const LANG_LABEL: Record<ShadowingLanguage, string> = {
   zh: '중국어',
   ko: '한국어',
 };
+
+// 이솝우화 영어 스토리 샘플 (공개 저작물: The Tortoise and the Hare).
+// 단락을 페이지로 나눠 다중 페이지 + 연속 재생을 시연한다.
+const AESOP_TITLE = 'The Tortoise and the Hare';
+const AESOP_PAGES: string[] = [
+  `A Hare was making fun of the Tortoise one day for being so slow. "Do you ever get anywhere?" he asked with a mocking laugh. "Yes," replied the Tortoise, "and I get there sooner than you think. I will run you a race and prove it."`,
+  `The Hare was much amused at the idea of running a race with the Tortoise, but for the fun of the thing he agreed. So the Fox, who had consented to act as judge, marked the distance and started the runners off.`,
+  `The Hare was soon far out of sight, and to make the Tortoise feel very deeply how ridiculous it was for him to try a race with a Hare, he lay down beside the course to take a nap until the Tortoise should catch up.`,
+  `The Tortoise meanwhile kept going slowly but steadily, and, after a time, passed the place where the Hare was sleeping. But the Hare slept on very peacefully, and when at last he did wake up, the Tortoise was near the goal. The Hare now ran his swiftest, but he could not overtake the Tortoise in time. The race is not always to the swift.`,
+];
 
 /**
  * Phase 0 PoC: 페이지별 자동 Shadowing 실험실.
@@ -79,6 +89,16 @@ export default function ShadowingLabPage() {
     setNotice(null);
     setText(SAMPLE[language]);
     loadPages([{ pageNumber: 1, text: SAMPLE[language] }]);
+  };
+
+  const handleAesop = () => {
+    setLanguage('en');
+    const pgs = AESOP_PAGES.map((t, i) => ({ pageNumber: i + 1, text: t }));
+    setText(pgs[0].text);
+    loadPages(pgs);
+    setNotice(
+      `이솝우화 "${AESOP_TITLE}" ${pgs.length}페이지를 불러왔습니다. "연속 재생"을 켜고 재생하면 페이지를 넘어가며 끝까지 읽습니다.`,
+    );
   };
 
   const handlePdf = async (file: File) => {
@@ -181,6 +201,9 @@ export default function ShadowingLabPage() {
             </Button>
             <Button variant="secondary" onClick={handleSample} icon={<FileText className="h-4 w-4" />}>
               샘플 불러오기
+            </Button>
+            <Button variant="secondary" onClick={handleAesop} icon={<BookOpen className="h-4 w-4" />}>
+              이솝우화 샘플
             </Button>
 
             <label className="ml-auto inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50">
