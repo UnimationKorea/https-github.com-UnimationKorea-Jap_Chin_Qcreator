@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { FileText, Wand2, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '../components/ui';
 import ShadowingViewer from '../components/shadowing/ShadowingViewer';
+import ProjectPanel from '../components/shadowing/ProjectPanel';
 import { splitIntoSentences } from '../utils/sentenceSplitter';
+import type { ProjectPage } from '../utils/shadowingStore';
 import type { ShadowingLanguage } from '../types/shadowing';
 
 // PDF는 무거우므로(pdfjs) 업로드 시에만 동적 로드한다.
@@ -10,10 +12,7 @@ const isLikelyPdf = (file: File) =>
   file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
 /** 한 페이지의 텍스트. pageNumber는 PDF 원본 페이지 번호(텍스트 입력 시 1) */
-interface PageText {
-  pageNumber: number;
-  text: string;
-}
+type PageText = ProjectPage;
 
 const SAMPLE: Record<ShadowingLanguage, string> = {
   ja: '今日はいい天気です。公園へ散歩に行きましょう。猫が木の下で寝ています。',
@@ -41,6 +40,7 @@ export default function ShadowingLabPage() {
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   const total = pages.length;
   const page = pages[currentPage];
@@ -51,10 +51,21 @@ export default function ShadowingLabPage() {
     [page, language],
   );
 
+  // 새 입력(생성/샘플/PDF): 저장 연결을 끊어 새 프로젝트로 다룬다
   const loadPages = (next: PageText[]) => {
     setShouldAutoPlay(false);
     setPages(next);
     setCurrentPage(0);
+    setProjectId(null);
+  };
+
+  // 저장된 프로젝트/가져온 내용을 에디터에 적용 (projectId는 ProjectPanel이 관리)
+  const applyLoaded = ({ language: lng, pages: pgs }: { language: ShadowingLanguage; pages: PageText[] }) => {
+    setShouldAutoPlay(false);
+    setLanguage(lng);
+    setPages(pgs);
+    setCurrentPage(0);
+    setText(pgs[0]?.text ?? '');
   };
 
   const handleGenerate = () => {
@@ -195,11 +206,26 @@ export default function ShadowingLabPage() {
         </CardContent>
       </Card>
 
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>2. 프로젝트 저장 · 재사용</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProjectPanel
+            language={language}
+            pages={pages}
+            projectId={projectId}
+            onProjectIdChange={setProjectId}
+            onLoad={applyLoaded}
+          />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>
-              2. Shadowing 재생{' '}
+              3. Shadowing 재생{' '}
               {sentences.length > 0 && (
                 <span className="text-sm font-normal text-gray-500">({sentences.length}문장)</span>
               )}
