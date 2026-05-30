@@ -5,18 +5,16 @@ on:
     branches: [ebook_upgrade0529]
   workflow_dispatch:
 
+# gh-pages 브랜치로 푸시하기 위한 쓰기 권한
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# 한 번에 하나의 배포만 진행
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,23 +33,19 @@ jobs:
       # Pages는 /<repo>/ 하위경로로 서빙되므로 base를 저장소명으로 주입
       - run: npm run build -- --base=/${{ github.event.repository.name }}/
 
-      # SPA 딥링크 폴백(404 → index) + Jekyll 비활성화
+      # SPA 딥링크 폴백(404 -> index) + Jekyll 비활성화
       - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
 
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # 서드파티 액션 없이 순정 git으로 gh-pages 브랜치에 배포
+      - name: Publish to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          git init -q
+          git checkout -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${{ github.sha }}"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" gh-pages
