@@ -75,8 +75,11 @@ export default function ShadowingViewer({
     [language],
   );
   const sortedVoices = useMemo(() => {
-    const match = voices.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
-    const rest = voices.filter((v) => !v.lang.toLowerCase().startsWith(langPrefix));
+    // 로컬(오프라인) 음성 우선 — 온라인 'Natural' 음성은 외부 호스팅에서 synthesis-failed로 자주 실패
+    const byLocal = (a: SpeechSynthesisVoice, b: SpeechSynthesisVoice) =>
+      Number(b.localService) - Number(a.localService);
+    const match = voices.filter((v) => v.lang.toLowerCase().startsWith(langPrefix)).sort(byLocal);
+    const rest = voices.filter((v) => !v.lang.toLowerCase().startsWith(langPrefix)).sort(byLocal);
     return [...match, ...rest];
   }, [voices, langPrefix]);
 
@@ -86,7 +89,9 @@ export default function ShadowingViewer({
     loadVoices().then((vs) => {
       if (!alive) return;
       setVoices(vs);
-      const preferred = vs.find((v) => v.lang.toLowerCase().startsWith(langPrefix));
+      const matched = vs.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
+      // 로컬 음성을 기본 선택(없으면 첫 일치 음성)
+      const preferred = matched.find((v) => v.localService) ?? matched[0];
       if (preferred) setVoiceURI(preferred.voiceURI);
     });
     return () => {
@@ -118,6 +123,14 @@ export default function ShadowingViewer({
       onError: (msg: string) => {
         setError(msg);
         setPlaying(false);
+      },
+      onVoiceFallback: () => {
+        // 온라인 음성 실패 → 기본(로컬) 음성으로 자동 전환되었으므로 오류 해제 + 드롭다운 동기화
+        setError(null);
+        const local = window.speechSynthesis
+          .getVoices()
+          .find((v) => v.lang.toLowerCase().startsWith(langPrefix) && v.localService);
+        if (local) setVoiceURI(local.voiceURI);
       },
     };
 

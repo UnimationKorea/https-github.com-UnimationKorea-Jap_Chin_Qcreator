@@ -17,6 +17,8 @@ export interface ShadowingPlayerCallbacks {
   onWordBoundary?: (sentenceIndex: number, charIndex: number, charLength: number) => void;
   onEnd?: () => void;
   onError?: (message: string) => void;
+  /** 온라인 음성 실패로 기본(로컬) 음성으로 자동 전환됨을 알림 */
+  onVoiceFallback?: () => void;
 }
 
 const BCP47: Record<ShadowingLanguage, string> = {
@@ -124,7 +126,7 @@ export class ShadowingPlayer {
     }
   }
 
-  private speakCurrent() {
+  private speakCurrent(isRetry = false) {
     if (this.stopped) return;
     if (this.index >= this.sentences.length) {
       this.playing = false;
@@ -155,6 +157,17 @@ export class ShadowingPlayer {
     utter.onerror = (e) => {
       // 'canceled'/'interrupted'는 사용자 조작이므로 무시
       if (e.error === 'canceled' || e.error === 'interrupted') return;
+      // 온라인('Natural') 음성 등이 실패하면 기본(로컬) 음성으로 1회 자동 폴백 후 재시도
+      const recoverable = e.error === 'synthesis-failed' || e.error === 'network' || e.error === 'audio-busy';
+      if (!isRetry && recoverable && this.voice) {
+        this.voice = null;
+        this.callbacks.onVoiceFallback?.();
+        window.speechSynthesis.cancel();
+        setTimeout(() => {
+          if (!this.stopped && this.playing) this.speakCurrent(true);
+        }, 120);
+        return;
+      }
       this.playing = false;
       this.callbacks.onError?.(`음성 합성 오류: ${e.error}`);
     };
