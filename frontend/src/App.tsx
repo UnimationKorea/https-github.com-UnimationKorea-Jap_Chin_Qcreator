@@ -5,10 +5,11 @@ import UploadPage from './pages/UploadPage';
 import AnalysisPage from './pages/AnalysisPage';
 import ResultsPage from './pages/ResultsPage';
 import ComponentShowcase from './pages/ComponentShowcase';
+import ShadowingLabPage from './pages/ShadowingLabPage';
 
 function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <Layout>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -16,6 +17,7 @@ function App() {
           <Route path="/analysis/:subjectId" element={<AnalysisPage />} />
           <Route path="/results/:subjectId/:resultId?" element={<ResultsPage />} />
           <Route path="/showcase" element={<ComponentShowcase />} />
+          <Route path="/shadowing" element={<ShadowingLabPage />} />
         </Routes>
       </Layout>
     </Router>

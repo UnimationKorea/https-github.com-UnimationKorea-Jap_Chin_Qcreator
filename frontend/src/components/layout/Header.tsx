@@ -1,5 +1,6 @@
-import { BookOpen, Languages } from 'lucide-react';
+import { BookOpen, Languages, Mic } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface HeaderProps {
   currentLanguage?: string;
@@ -33,7 +34,15 @@ export default function Header({ currentLanguage = 'ko', onLanguageChange }: Hea
             </div>
           </div>
 
-          {/* Language Selector */}
+          {/* Nav + Language Selector */}
+          <div className="flex items-center gap-2">
+          <Link
+            to="/shadowing"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <Mic className="w-4 h-4 text-primary-600" />
+            Shadowing
+          </Link>
           <div className="relative">
             <button
               onClick={() => setIsLangOpen(!isLangOpen)}
@@ -73,6 +82,7 @@ export default function Header({ currentLanguage = 'ko', onLanguageChange }: Hea
                 ))}
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>
